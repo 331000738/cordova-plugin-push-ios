@@ -1,27 +1,4 @@
-/*
- Copyright 2009-2011 Urban Airship Inc. All rights reserved.
-
- Redistribution and use in source and binary forms, with or without
- modification, are permitted provided that the following conditions are met:
-
- 1. Redistributions of source code must retain the above copyright notice, this
- list of conditions and the following disclaimer.
-
- 2. Redistributions in binaryform must reproduce the above copyright notice,
- this list of conditions and the following disclaimer in the documentation
- and/or other materials provided withthe distribution.
-
- THIS SOFTWARE IS PROVIDED BY THE URBAN AIRSHIP INC``AS IS'' AND ANY EXPRESS OR
- IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO
- EVENT SHALL URBAN AIRSHIP INC OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
- INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
- LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
- OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
- ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
+// 去除了firebase message相关内容
 
 //  See GGLInstanceID.h
 #define GMP_NO_MODULES true
@@ -29,10 +6,6 @@
 #import "PushPlugin.h"
 #import "AppDelegate+notification.h"
 
-@import Firebase;
-@import FirebaseCore;
-@import FirebaseInstanceID;
-@import FirebaseMessaging;
 
 @implementation PushPlugin : CDVPlugin
 
@@ -53,31 +26,7 @@
 @synthesize fcmRegistrationToken;
 @synthesize fcmTopics;
 
--(void)initRegistration;
-{
-    [[FIRInstanceID instanceID] instanceIDWithHandler:^(FIRInstanceIDResult * _Nullable result, NSError * _Nullable error) {
-        if (error != nil) {
-            NSLog(@"Error fetching remote instance ID: %@", error);
-        } else {
-            NSLog(@"Remote instance ID (FCM Registration) Token: %@", result.token);
 
-            [self setFcmRegistrationToken: result.token];
-
-            NSString* message = [NSString stringWithFormat:@"Remote InstanceID token: %@", result.token];
-
-            id topics = [self fcmTopics];
-            if (topics != nil) {
-                for (NSString *topic in topics) {
-                    NSLog(@"subscribe to topic: %@", topic);
-                    id pubSub = [FIRMessaging messaging];
-                    [pubSub subscribeToTopic:topic];
-                }
-            }
-
-            [self registerWithToken:result.token];
-        }
-    }];
-}
 
 //  FCM refresh token
 //  Unclear how this is testable under normal circumstances
@@ -85,7 +34,7 @@
 #if !TARGET_IPHONE_SIMULATOR
     // A rotation of the registration tokens is happening, so the app needs to request a new token.
     NSLog(@"The FCM registration token needs to be changed.");
-    [self initRegistration];
+
 #endif
 }
 
@@ -117,10 +66,8 @@
     NSArray* topics = [command argumentAtIndex:0];
 
     if (topics != nil) {
-        id pubSub = [FIRMessaging messaging];
         for (NSString *topic in topics) {
             NSLog(@"unsubscribe from topic: %@", topic);
-            [pubSub unsubscribeFromTopic:topic];
         }
     } else {
         [[UIApplication sharedApplication] unregisterForRemoteNotifications];
@@ -134,8 +81,6 @@
 
     if (topic != nil) {
         NSLog(@"subscribe from topic: %@", topic);
-        id pubSub = [FIRMessaging messaging];
-        [pubSub subscribeToTopic:topic];
         NSLog(@"Successfully subscribe to topic %@", topic);
         [self successWithMessage:command.callbackId withMsg:[NSString stringWithFormat:@"Successfully subscribe to topic %@", topic]];
     } else {
@@ -150,8 +95,6 @@
 
     if (topic != nil) {
         NSLog(@"unsubscribe from topic: %@", topic);
-        id pubSub = [FIRMessaging messaging];
-        [pubSub unsubscribeFromTopic:topic];
         NSLog(@"Successfully unsubscribe from topic %@", topic);
         [self successWithMessage:command.callbackId withMsg:[NSString stringWithFormat:@"Successfully unsubscribe from topic %@", topic]];
     } else {
@@ -172,26 +115,14 @@
             self.callbackId = command.callbackId;
 
             PKPushRegistry *pushRegistry = [[PKPushRegistry alloc] initWithQueue:dispatch_get_main_queue()];
-            pushRegistry.delegate = self;
+//            pushRegistry.delegate = self;
             pushRegistry.desiredPushTypes = [NSSet setWithObject:PKPushTypeVoIP];
         }];
     } else {
         NSLog(@"Push Plugin VoIP missing or false");
-        [[NSNotificationCenter defaultCenter]
-         addObserver:self selector:@selector(onTokenRefresh)
-         name:kFIRInstanceIDTokenRefreshNotification object:nil];
+        
 
-        [[NSNotificationCenter defaultCenter]
-         addObserver:self selector:@selector(sendDataMessageFailure:)
-         name:FIRMessagingSendErrorNotification object:nil];
-
-        [[NSNotificationCenter defaultCenter]
-         addObserver:self selector:@selector(sendDataMessageSuccess:)
-         name:FIRMessagingSendSuccessNotification object:nil];
-
-        [[NSNotificationCenter defaultCenter]
-         addObserver:self selector:@selector(didDeleteMessagesOnServer)
-         name:FIRMessagingMessagesDeletedNotification object:nil];
+        
 
         [self.commandDelegate runInBackground:^ {
             NSLog(@"Push Plugin register called");
@@ -320,9 +251,7 @@
                 NSLog(@"Using FCM Notification");
                 [self setUsesFCM: YES];
                 dispatch_async(dispatch_get_main_queue(), ^{
-                    if([FIRApp defaultApp] == nil)
-                        [FIRApp configure];
-                    [self initRegistration];
+                    
                 });
             } else {
                 NSLog(@"Using APNS Notification");
